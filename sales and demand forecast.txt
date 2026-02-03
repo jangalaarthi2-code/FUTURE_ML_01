@@ -1,0 +1,100 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+import os
+
+# ----------------------------
+# 1. Load & Clean Data
+# ----------------------------
+file_path = "sales_data.csv"
+
+# Check if the file exists, if not, create a dummy one
+if not os.path.exists(file_path):
+    print(f"Warning: '{file_path}' not found. Generating a dummy file for demonstration.")
+    # Create dummy data
+    dummy_dates = pd.date_range(start='2022-01-01', periods=100, freq='D')
+    dummy_sales = np.random.randint(50, 200, size=100) + np.sin(np.arange(100)/10) * 30
+    dummy_df = pd.DataFrame({'date': dummy_dates, 'sales': dummy_sales})
+    dummy_df.to_csv(file_path, index=False)
+
+df = pd.read_csv(file_path)
+df['date'] = pd.to_datetime(df['date'])
+df = df.sort_values('date')
+df['sales'] = df['sales'].ffill() # Changed fillna(method='ffill') to ffill()
+
+# ----------------------------
+# 2. Feature Engineering
+# ----------------------------
+df['year'] = df['date'].dt.year
+df['month'] = df['date'].dt.month
+df['day'] = df['date'].dt.day
+df['day_of_week'] = df['date'].dt.dayofweek
+df['week_of_year'] = df['date'].dt.isocalendar().week.astype(int)
+df['quarter'] = df['date'].dt.quarter
+
+X = df[['year','month','day','day_of_week','week_of_year','quarter']]
+y = df['sales']
+
+# ----------------------------
+# 3. Train / Test Split (Time-based)
+# ----------------------------
+split = int(len(df) * 0.8)
+X_train, X_test = X.iloc[:split], X.iloc[split:]
+y_train, y_test = y.iloc[:split], y.iloc[split:]
+
+# ----------------------------
+# 4. Train Model
+# ----------------------------
+model = LinearRegression()
+model.fit(X_train, y_train)
+y_pred = model.predict(X_test)
+
+# ----------------------------
+# 5. Evaluation
+# ----------------------------
+mae = mean_absolute_error(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+
+print(f"MAE  : {mae:.2f}")
+print(f"RMSE : {rmse:.2f}")
+
+# ----------------------------
+# 6. Visualization
+# ----------------------------
+plt.figure(figsize=(12,6))
+plt.plot(df['date'], df['sales'], label='Actual Sales')
+plt.plot(df['date'].iloc[split:], y_pred, linestyle='--', label='Forecast')
+plt.title("Sales Forecast vs Actual")
+plt.xlabel("Date")
+plt.ylabel("Sales")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# ----------------------------
+# 7. Future 30-Day Forecast
+# ----------------------------
+future_dates = pd.date_range(df['date'].max(), periods=30, freq='D')
+future_df = pd.DataFrame({
+    'year': future_dates.year,
+    'month': future_dates.month,
+    'day': future_dates.day,
+    'day_of_week': future_dates.dayofweek,
+    'week_of_year': future_dates.isocalendar().week.astype(int),
+    'quarter': future_dates.quarter
+})
+
+future_sales = model.predict(future_df)
+
+plt.figure(figsize=(10,5))
+plt.plot(future_dates, future_sales, label='30-Day Forecast')
+plt.title("Future Sales Forecast")
+plt.xlabel("Date")
+plt.ylabel("Sales")
+plt.legend()
+plt.grid(True)
+plt.tight_layout()
+plt.show()
